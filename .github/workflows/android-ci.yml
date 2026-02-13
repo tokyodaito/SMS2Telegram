@@ -1,0 +1,134 @@
+name: Android CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null
+
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Create local.properties
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" > local.properties
+
+      - name: Ensure gradlew is runnable
+        run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Build release APK
+        run: ./gradlew --no-daemon clean assembleRelease
+
+      - name: Prepare artifact
+        id: prepare
+        run: |
+          APK_PATH="$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK_PATH" ]; then
+            echo "Release APK not found"
+            exit 1
+          fi
+          mkdir -p dist
+          APK_NAME="sms2telegram-${GITHUB_SHA::7}.apk"
+          cp "$APK_PATH" "dist/${APK_NAME}"
+          echo "apk_file=dist/${APK_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sms2telegram-apk
+          path: ${{ steps.prepare.outputs.apk_file }}
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-release:
+    name: Publish GitHub Release Asset
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sms2telegram-apk
+          path: dist
+
+      - name: Create release and upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+  publish-package:
+    name: Publish APK to GitHub Packages (GHCR)
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sms2telegram-apk
+          path: dist
+
+      - name: Set up ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push APK as OCI artifact
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          TAG_NAME: ${{ github.ref_name }}
+          GIT_SHA: ${{ github.sha }}
+          GIT_REPO: ${{ github.repository }}
+        run: |
+          OWNER_LC="$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')"
+          NAME_LC="$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')"
+          APK_FILE="$(find dist -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK_FILE" ]; then
+            echo "No APK file found in dist/"
+            exit 1
+          fi
+          PACKAGE_REF="ghcr.io/${OWNER_LC}/${NAME_LC}-apk:${TAG_NAME}"
+          oras push "$PACKAGE_REF" \
+            "$APK_FILE:application/vnd.android.package-archive" \
+            --annotation "org.opencontainers.image.source=https://github.com/${GIT_REPO}" \
+            --annotation "org.opencontainers.image.revision=${GIT_SHA}"

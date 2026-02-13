@@ -56,3 +56,10 @@ Remote control polling is disabled by default to save battery. Enable it in sett
 ## Download
 
 See https://github.com/hyhugh/SMS2Telegram/tree/master/app/release
+
+## CI/CD (GitHub Actions)
+
+- On every push/PR to `master`, workflow builds a release APK and stores it as workflow artifact.
+- On tag push `v*` (for example `v1.3.0`), workflow additionally:
+  - publishes APK as GitHub Release asset,
+  - publishes APK into GitHub Packages (GHCR) as OCI artifact.
