@@ -20,6 +20,29 @@ You should be able to follow https://dev.to/rizkyrajitha/get-notifications-with-
 
 You'll also want to turn off battery optimisation for this APP to avoid it being killed by the system.
 
+### Forwarded events
+
+- SMS
+- Missed calls
+- Battery low
+- Power connected/disconnected
+- Airplane mode changed
+- Device boot completed
+- Device shutdown
+- SIM state changed
+
+New event types are disabled by default after update. Configure them in Settings -> Event Forwarding.
+
+### Telegram control panel
+
+Set `Admin Chat Ids` in settings (comma separated). Only these chats can use commands:
+
+- `/status`
+- `/list_events`
+- `/enable <event|all>`
+- `/disable <event|all>`
+- `/help`
+
 
 ## Download
 

@@ -4,40 +4,38 @@ import android.content.Context
 import android.util.Log
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import com.android.volley.Response
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.Volley
-import org.json.JSONObject
-
-private const val TAG = "TelegramMessageWorker"
+import life.hnj.sms2telegram.telegram.TelegramApi
 
 class TelegramMessageWorker(
     appContext: Context,
     workerParams: WorkerParameters,
-) :
-    Worker(appContext, workerParams) {
+) : Worker(appContext, workerParams) {
 
     override fun doWork(): Result {
-        val apiUrl = inputData.getString("url")
-        val msg = inputData.getString("msg")
-        val chatId = inputData.getString("chat_id")
-
-        val queue = Volley.newRequestQueue(applicationContext)
-        val payload = JSONObject()
-        payload.put("text", msg)
-        payload.put("chat_id", chatId)
-
-
-        val req = object : JsonObjectRequest(
-            Method.POST,
-            apiUrl,
-            payload,
-            Response.Listener { _ -> Log.d(TAG, "MSG send success") },
-            Response.ErrorListener { _ ->
-                Log.d(TAG, "MSG send error")
-            }) {
+        val botKey = inputData.getString(KEY_BOT_KEY).orEmpty()
+        val chatId = inputData.getString(KEY_CHAT_ID).orEmpty()
+        val msg = inputData.getString(KEY_MESSAGE).orEmpty()
+        if (botKey.isBlank() || chatId.isBlank() || msg.isBlank()) {
+            Log.w(TAG, "Invalid Telegram worker input")
+            return Result.failure()
         }
-        queue.add(req)
-        return Result.success()
+
+        return try {
+            if (TelegramApi.sendMessage(botKey, chatId, msg)) {
+                Result.success()
+            } else {
+                Result.retry()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Telegram send failed", e)
+            Result.retry()
+        }
+    }
+
+    companion object {
+        private const val TAG = "TelegramMessageWorker"
+        const val KEY_BOT_KEY = "bot_key"
+        const val KEY_CHAT_ID = "chat_id"
+        const val KEY_MESSAGE = "msg"
     }
 }

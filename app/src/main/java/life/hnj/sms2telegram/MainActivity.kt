@@ -1,11 +1,10 @@
 package life.hnj.sms2telegram
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
+import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -15,16 +14,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.runBlocking
-import life.hnj.sms2telegram.smshandler.SMSHandleForegroundService
-
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+import life.hnj.sms2telegram.runtime.SyncRuntimeManager
+import life.hnj.sms2telegram.settings.SettingsRepository
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var settingsRepository: SettingsRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val requestPermissionLauncher =
             registerForActivityResult(
@@ -34,17 +30,11 @@ class MainActivity : AppCompatActivity() {
                     // Permission is granted. Continue the action or workflow in your
                     // app.
                 } else {
-                    // Explain to the user that the feature is unavailable because the
-                    // features requires a permission that the user has denied. At the
-                    // same time, respect the user's decision. Don't link to system
-                    // settings in an effort to convince the user to change their
-                    // decision.
                     Toast.makeText(
                         applicationContext,
-                        "SMS2Telegram needs SMS read permission",
+                        "A permission was denied. Some events may not be delivered.",
                         Toast.LENGTH_LONG
                     ).show()
-                    this.finishAffinity()
                 }
             }
 
@@ -53,51 +43,35 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.action_bar))
 
-        val sync2TgEnabledKey = sync2TelegramKey(resources)
-        val sync2TgEnabled = getBooleanVal(applicationContext, sync2TgEnabledKey)
+        settingsRepository = SettingsRepository(applicationContext)
+        runBlocking { settingsRepository.migrateLegacyIfNeeded() }
+        val syncEnabled = settingsRepository.isSyncEnabledBlocking()
 
         val toggle = findViewById<SwitchCompat>(R.id.enable_telegram_sync)
-        val serviceIntent = Intent(
-            applicationContext, SMSHandleForegroundService::class.java
-        )
-        if (sync2TgEnabled) {
-            checkPermission(Manifest.permission.RECEIVE_SMS, requestPermissionLauncher)
-            checkPermission(Manifest.permission.POST_NOTIFICATIONS, requestPermissionLauncher)
-            startSMSService(serviceIntent)
+        if (syncEnabled) {
+            requestPermissions(requestPermissionLauncher)
+            SyncRuntimeManager.start(applicationContext)
         }
-        toggle.isChecked = sync2TgEnabled
+        toggle.isChecked = syncEnabled
         toggle.setOnCheckedChangeListener { _, isChecked ->
-            runBlocking { setSync2TgEnabled(sync2TgEnabledKey, isChecked) }
+            runBlocking { settingsRepository.setSyncEnabled(isChecked) }
             if (isChecked) {
-                checkPermission(Manifest.permission.RECEIVE_SMS, requestPermissionLauncher)
-                checkPermission(Manifest.permission.POST_NOTIFICATIONS, requestPermissionLauncher)
-                startSMSService(serviceIntent)
+                requestPermissions(requestPermissionLauncher)
+                SyncRuntimeManager.start(applicationContext)
+                Toast.makeText(applicationContext, "The service started", Toast.LENGTH_SHORT).show()
             } else {
-                applicationContext.stopService(serviceIntent)
+                SyncRuntimeManager.stop(applicationContext)
                 Toast.makeText(applicationContext, "The service stopped", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun startSMSService(serviceIntent: Intent) {
-        val alreadyStarted = applicationContext.startService(serviceIntent)
-        if (alreadyStarted != null) {
-            Log.d(TAG, "The service is already started")
-            Toast.makeText(applicationContext, "The service is already started", Toast.LENGTH_SHORT)
-                .show()
-        } else {
-            Log.d(TAG, "Background service started")
-            Toast.makeText(applicationContext, "The service started", Toast.LENGTH_SHORT).show()
+    private fun requestPermissions(requestPermissionLauncher: ActivityResultLauncher<String>) {
+        checkPermission(Manifest.permission.RECEIVE_SMS, requestPermissionLauncher)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            checkPermission(Manifest.permission.POST_NOTIFICATIONS, requestPermissionLauncher)
         }
-    }
-
-    private suspend fun setSync2TgEnabled(
-        sync2TgEnabledKey: Preferences.Key<Boolean>,
-        value: Boolean
-    ) {
-        applicationContext.dataStore.edit { settings ->
-            settings[sync2TgEnabledKey] = value
-        }
+        checkPermission(Manifest.permission.READ_PHONE_STATE, requestPermissionLauncher)
     }
 
     private fun checkPermission(
@@ -109,8 +83,6 @@ class MainActivity : AppCompatActivity() {
             ) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            // You can directly ask for the permission.
-            // The registered ActivityResultCallback gets the result of this request.
             requestPermissionLauncher.launch(perm)
         }
     }
@@ -137,7 +109,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private companion object {
-        const val TAG = "MainActivity"
-    }
 }

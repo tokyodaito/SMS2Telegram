@@ -1,6 +1,6 @@
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <PreferenceCategory app:title="@string/messages_header">
+    <PreferenceCategory app:title="@string/telegram_settings">
 
         <EditTextPreference
             app:key="telegram_bot_key"
@@ -12,6 +12,75 @@
             app:title="@string/telegram_chat_id"
             app:useSimpleSummaryProvider="true" />
 
+        <EditTextPreference
+            app:key="telegram_admin_chat_ids"
+            app:summary="@string/telegram_admin_chat_ids_summary"
+            app:title="@string/telegram_admin_chat_ids"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/service_header">
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.tg.enabled"
+            app:summary="@string/sync_telegram_summary"
+            app:title="@string/sync_telegram_title" />
+
+        <Preference
+            app:key="send_test_message"
+            app:summary="@string/send_test_message_summary"
+            app:title="@string/send_test_message" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/events_header">
+        <SwitchPreferenceCompat
+            app:defaultValue="true"
+            app:key="sms2telegram.settings.events.sms"
+            app:title="@string/event_sms" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.missed_call"
+            app:title="@string/event_missed_call" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.battery_low"
+            app:title="@string/event_battery_low" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.power_connected"
+            app:title="@string/event_power_connected" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.power_disconnected"
+            app:title="@string/event_power_disconnected" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.airplane_mode"
+            app:title="@string/event_airplane_mode" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.boot_completed"
+            app:title="@string/event_boot_completed" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.shutdown"
+            app:title="@string/event_shutdown" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.events.sim_state"
+            app:title="@string/event_sim_state" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/messages_header">
         <EditTextPreference
             app:key="sim0_number"
             app:title="@string/sim0_number"

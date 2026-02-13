@@ -5,15 +5,32 @@
 
     <!-- Preference Titles -->
     <string name="messages_header">Messages</string>
+    <string name="service_header">Service</string>
+    <string name="events_header">Event Forwarding</string>
 
     <!-- Messages Preferences -->
     <string name="telegram_settings">Telegram Settings</string>
 
     <!-- Sync Preferences -->
-    <string name="sync_telegram_title">Sync SMS to telegram</string>
+    <string name="sync_telegram_title">Sync phone events to Telegram</string>
+    <string name="sync_telegram_summary">Enable background service and Telegram control polling</string>
     <string name="action_settings">Settings</string>
     <string name="telegram_bot_key">Telegram Bot Key</string>
     <string name="telegram_chat_id">Telegram Chat Id</string>
+    <string name="telegram_admin_chat_ids">Admin Chat Ids (comma separated)</string>
+    <string name="telegram_admin_chat_ids_summary">Only these chats can execute /enable and /disable commands</string>
+    <string name="send_test_message">Send test message</string>
+    <string name="send_test_message_summary">Sends a test payload to configured Telegram chat</string>
+
+    <string name="event_sms">SMS</string>
+    <string name="event_missed_call">Missed call</string>
+    <string name="event_battery_low">Battery low</string>
+    <string name="event_power_connected">Power connected</string>
+    <string name="event_power_disconnected">Power disconnected</string>
+    <string name="event_airplane_mode">Airplane mode change</string>
+    <string name="event_boot_completed">Device boot completed</string>
+    <string name="event_shutdown">Device shutdown</string>
+    <string name="event_sim_state">SIM state change</string>
 
     <string name="enable_telegram_sync_key">sms2telegram.settings.tg.enabled</string>
     <string name="enable_telegram_bot_key_key">sms2telegram.settings.tg.bot.key</string>

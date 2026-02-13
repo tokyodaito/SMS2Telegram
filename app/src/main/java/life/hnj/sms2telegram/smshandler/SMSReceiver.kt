@@ -3,98 +3,54 @@ package life.hnj.sms2telegram.smshandler
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.telephony.SmsMessage
 import android.util.Log
-import android.widget.Toast
-import androidx.preference.PreferenceManager
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.WorkRequest
-import life.hnj.sms2telegram.getBooleanVal
-import life.hnj.sms2telegram.sync2TelegramKey
 import kotlin.math.max
-
+import life.hnj.sms2telegram.events.EventForwarder
+import life.hnj.sms2telegram.events.EventType
+import life.hnj.sms2telegram.events.PhoneEvent
+import life.hnj.sms2telegram.settings.SettingsRepository
 
 private const val TAG = "SMSHandler"
 
-class SMSReceiver : BroadcastReceiver() {
+class SMSReceiver(
+    private val eventForwarder: EventForwarder = EventForwarder(),
+) : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val sync2TgEnabledKey = sync2TelegramKey(context.resources)
-        val sync2TgEnabled = getBooleanVal(context, sync2TgEnabledKey)
-        if (!sync2TgEnabled) {
-            Log.d(TAG, "sync2TgEnabled is false, returning")
-            return
-        }
-
-        Log.d(TAG, "sync2TgEnabled, and received new sms")
-        // This method is called when the BroadcastReceiver is receiving an Intent broadcast.
         val bundle = intent.extras ?: return
         val format = bundle.getString("format")
         val pdus = bundle["pdus"] as Array<*>? ?: return
         val simIndex =
             max(bundle.getInt("phone", -1), bundle.getInt("android.telephony.extra.SLOT_INDEX", -1))
-        Log.d(TAG, bundle.toString())
-        val store = PreferenceManager.getDefaultSharedPreferences(context)
-        val phoneNum = when (simIndex) {
-            0 -> store.getString("sim0_number", "Please configure phone number in settings")
-            1 -> store.getString("sim1_number", "Please configure phone number in settings")
-            else -> "Unsupported feature (please contact the developer)"
+
+        val settingsRepository = SettingsRepository(context)
+        val phoneNum = settingsRepository.getSimNumberBlocking(simIndex)
+
+        val messages = pdus.mapNotNull { part ->
+            runCatching {
+                SmsMessage.createFromPdu(part as ByteArray, format)
+            }.getOrNull()
+        }
+        if (messages.isEmpty()) {
+            return
         }
 
-        val msgs: List<SmsMessage?> =
-            pdus.map { i -> SmsMessage.createFromPdu(i as ByteArray, format) }
-        val fromAddrToMsgBody = HashMap<String, String>()
-        for (msg in msgs) {
-            val fromAddr = msg?.originatingAddress ?: "unknown"
-            fromAddrToMsgBody[fromAddr] =
-                fromAddrToMsgBody.getOrDefault(fromAddr, "") + msg?.messageBody
+        val mergedMessages = HashMap<String, String>()
+        for (msg in messages) {
+            val fromAddr = msg.originatingAddress ?: "unknown"
+            val body = msg.messageBody ?: ""
+            mergedMessages[fromAddr] = mergedMessages.getOrDefault(fromAddr, "") + body
         }
 
-        for (entry in fromAddrToMsgBody) {
-            // Build the message to show.
-            val strMessage = """
-                New SMS from ${entry.key}
-                to $phoneNum
-                
-                ${entry.value}
-            """.trimIndent()
-
-            Log.d(TAG, "onReceive: $strMessage")
-
-            sync2Telegram(store, context, strMessage)
+        for ((from, body) in mergedMessages) {
+            val event = PhoneEvent(
+                type = EventType.SMS,
+                title = "New SMS from $from",
+                body = "to $phoneNum\n\n$body",
+                metadata = mapOf("sim_slot" to simIndex.toString())
+            )
+            Log.d(TAG, "Forwarding SMS event from $from")
+            eventForwarder.forward(context, event)
         }
-    }
-
-    private fun sync2Telegram(
-        store: SharedPreferences,
-        context: Context,
-        strMessage: String,
-    ) {
-        val botKey = store.getString("telegram_bot_key", "")
-        if (botKey.isNullOrEmpty()) {
-            val err = "Telegram bot key is not configured"
-            Log.e(TAG, err)
-            Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-        }
-
-        val chatId = store.getString("telegram_chat_id", "")
-        if (botKey.isNullOrEmpty()) {
-            val err = "Telegram chat id is not configured"
-            Log.e(TAG, err)
-            Toast.makeText(context, err, Toast.LENGTH_LONG).show()
-        }
-
-        val url = "https://api.telegram.org/bot$botKey/sendMessage"
-        val data = Data.Builder()
-        data.putString("url", url)
-        data.putString("chat_id", chatId)
-        data.putString("msg", strMessage)
-
-        val tgMsgTask: WorkRequest =
-            OneTimeWorkRequestBuilder<TelegramMessageWorker>().setInputData(data.build())
-                .build()
-        WorkManager.getInstance(context).enqueue(tgMsgTask)
     }
 }
