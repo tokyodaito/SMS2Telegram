@@ -46,13 +46,25 @@ jobs:
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
 
+      - name: Decode signing keystore (optional)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          echo "SIGNING_STORE_FILE=${GITHUB_WORKSPACE}/keystore.jks" >> "$GITHUB_ENV"
+          echo "SIGNING_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "SIGNING_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "SIGNING_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
       - name: Build release APK
         run: ./gradlew --no-daemon clean assembleRelease
 
       - name: Prepare artifact
         id: prepare
         run: |
-          APK_PATH="$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          APK_PATH="$(find app/build/outputs/apk/release -type f -name '*.apk' | grep -v 'unsigned' | head -n 1)"
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH="$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          fi
           if [ -z "$APK_PATH" ]; then
             echo "Release APK not found"
             exit 1
