@@ -1,16 +1,13 @@
 package life.hnj.sms2telegram
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
-import life.hnj.sms2telegram.events.EventType
 import life.hnj.sms2telegram.runtime.SyncRuntimeManager
 import life.hnj.sms2telegram.settings.AppPreferenceDataStore
 import life.hnj.sms2telegram.settings.SettingsRepository
@@ -34,6 +31,8 @@ class SettingsActivity : AppCompatActivity() {
 
     class SettingsFragment : PreferenceFragmentCompat() {
         private lateinit var settingsRepository: SettingsRepository
+        private val requestPermissionsLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             val horizontalMargin = TypedValue.applyDimension(
@@ -58,7 +57,7 @@ class SettingsActivity : AppCompatActivity() {
 
             setupRuntimeSwitchListener()
             setupRemoteControlSwitchListener()
-            setupPermissionAwareEventListeners()
+            setupPermissionRequestOnEventChanges()
             setupTestMessageAction()
         }
 
@@ -77,6 +76,7 @@ class SettingsActivity : AppCompatActivity() {
             syncSwitch.setOnPreferenceChangeListener { _, newValue ->
                 val enabled = newValue as? Boolean ?: false
                 if (enabled) {
+                    requestAllRequiredPermissions()
                     SyncRuntimeManager.start(requireContext())
                 } else {
                     SyncRuntimeManager.stop(requireContext())
@@ -107,41 +107,40 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        private fun setupPermissionAwareEventListeners() {
-            setupPermissionRequestOnEnable(
-                SettingsRepository.eventEnabledKeyName(EventType.SMS),
-                Manifest.permission.RECEIVE_SMS
-            )
-            setupPermissionRequestOnEnable(
-                SettingsRepository.eventEnabledKeyName(EventType.MISSED_CALL),
-                Manifest.permission.READ_PHONE_STATE
-            )
-            setupPermissionRequestOnEnable(
-                SettingsRepository.eventEnabledKeyName(EventType.SIM_STATE),
-                Manifest.permission.READ_PHONE_STATE
-            )
-        }
-
-        private fun setupPermissionRequestOnEnable(preferenceKey: String, permission: String) {
-            val switch = findPreference<SwitchPreferenceCompat>(preferenceKey) ?: return
-            switch.setOnPreferenceChangeListener { _, newValue ->
-                val enabled = newValue as? Boolean ?: false
-                if (enabled && ContextCompat.checkSelfPermission(
-                        requireContext(),
-                        permission
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    requestPermissions(arrayOf(permission), PERMISSION_REQUEST_CODE)
+        private fun setupPermissionRequestOnEventChanges() {
+            val eventKeys = listOf(
+                "sms",
+                "missed_call",
+                "battery_low",
+                "power_connected",
+                "power_disconnected",
+                "airplane_mode",
+                "boot_completed",
+                "shutdown",
+                "sim_state",
+            ).map { suffix ->
+                "sms2telegram.settings.events.$suffix"
+            }
+            eventKeys.forEach { key ->
+                val switch = findPreference<SwitchPreferenceCompat>(key) ?: return@forEach
+                switch.setOnPreferenceChangeListener { _, newValue ->
+                    val enabled = newValue as? Boolean ?: false
+                    if (enabled) {
+                        requestAllRequiredPermissions()
+                    }
+                    listView.post {
+                        SyncRuntimeManager.reconfigure(requireContext())
+                    }
+                    true
                 }
-                listView.post {
-                    SyncRuntimeManager.reconfigure(requireContext())
-                }
-                true
             }
         }
 
-        companion object {
-            private const val PERMISSION_REQUEST_CODE = 1001
+        private fun requestAllRequiredPermissions() {
+            val missing = PermissionHelper.getMissingDangerousPermissions(requireContext())
+            if (missing.isNotEmpty()) {
+                requestPermissionsLauncher.launch(missing.toTypedArray())
+            }
         }
     }
 }

@@ -1,44 +1,34 @@
 package life.hnj.sms2telegram
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
-import androidx.core.content.ContextCompat
 import kotlinx.coroutines.runBlocking
-import life.hnj.sms2telegram.events.EventType
 import life.hnj.sms2telegram.runtime.SyncRuntimeManager
 import life.hnj.sms2telegram.settings.SettingsRepository
 
 class MainActivity : AppCompatActivity() {
     private lateinit var settingsRepository: SettingsRepository
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        val requestPermissionLauncher =
-            registerForActivityResult(
-                ActivityResultContracts.RequestPermission()
-            ) { isGranted: Boolean ->
-                if (isGranted) {
-                    // Permission is granted. Continue the action or workflow in your
-                    // app.
-                } else {
-                    Toast.makeText(
-                        applicationContext,
-                        "A permission was denied. Some events may not be delivered.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+    private val requestPermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            val denied = result.filterValues { granted -> !granted }.keys
+            if (denied.isNotEmpty()) {
+                Toast.makeText(
+                    applicationContext,
+                    "Some permissions are denied: ${denied.joinToString()}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
+        }
 
-
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.action_bar))
@@ -49,14 +39,14 @@ class MainActivity : AppCompatActivity() {
 
         val toggle = findViewById<SwitchCompat>(R.id.enable_telegram_sync)
         if (syncEnabled) {
-            requestPermissions(requestPermissionLauncher)
+            requestAllRequiredPermissions()
             SyncRuntimeManager.reconfigure(applicationContext)
         }
         toggle.isChecked = syncEnabled
         toggle.setOnCheckedChangeListener { _, isChecked ->
             runBlocking { settingsRepository.setSyncEnabled(isChecked) }
             if (isChecked) {
-                requestPermissions(requestPermissionLauncher)
+                requestAllRequiredPermissions()
                 SyncRuntimeManager.start(applicationContext)
                 Toast.makeText(applicationContext, "Sync enabled", Toast.LENGTH_SHORT).show()
             } else {
@@ -66,27 +56,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestPermissions(requestPermissionLauncher: ActivityResultLauncher<String>) {
-        if (settingsRepository.isEventEnabledBlocking(EventType.SMS)) {
-            checkPermission(Manifest.permission.RECEIVE_SMS, requestPermissionLauncher)
-        }
-        val needsPhoneStatePermission = settingsRepository.isEventEnabledBlocking(EventType.MISSED_CALL) ||
-            settingsRepository.isEventEnabledBlocking(EventType.SIM_STATE)
-        if (needsPhoneStatePermission) {
-            checkPermission(Manifest.permission.READ_PHONE_STATE, requestPermissionLauncher)
-        }
-    }
-
-    private fun checkPermission(
-        perm: String,
-        requestPermissionLauncher: ActivityResultLauncher<String>
-    ) {
-        if (ContextCompat.checkSelfPermission(
-                applicationContext, perm
-            ) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissionLauncher.launch(perm)
+    private fun requestAllRequiredPermissions() {
+        val missing = PermissionHelper.getMissingDangerousPermissions(applicationContext)
+        if (missing.isNotEmpty()) {
+            requestPermissionsLauncher.launch(missing.toTypedArray())
         }
     }
 
@@ -111,5 +84,4 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
 }
