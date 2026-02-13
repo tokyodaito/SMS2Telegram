@@ -24,6 +24,18 @@
     <string name="send_test_message">Send test message</string>
     <string name="send_test_message_summary">Sends a test payload to configured Telegram chat</string>
 
+    <string name="bot_connection_title">Bot Connection</string>
+    <string name="bot_key_hint">Telegram Bot API Key</string>
+    <string name="save">Save</string>
+    <string name="check_connection">Check</string>
+    <string name="connection_status">Connection status</string>
+    <string name="connection_unknown">Not checked</string>
+    <string name="users_title">Users</string>
+    <string name="add_user">Add user</string>
+    <string name="no_users_yet">No users connected yet.</string>
+    <string name="pairing_instructions">Send this code to the bot in a private chat to connect the user.</string>
+    <string name="user_avatar">User avatar</string>
+
     <string name="event_sms">SMS</string>
     <string name="event_missed_call">Missed call</string>
     <string name="event_battery_low">Battery low</string>

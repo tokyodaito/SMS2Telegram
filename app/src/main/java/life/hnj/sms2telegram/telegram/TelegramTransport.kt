@@ -17,15 +17,31 @@ object TelegramTransport {
 
     fun enqueueSend(context: Context, message: String) {
         val repository = SettingsRepository(context)
-        val target = repository.getTelegramTargetBlocking()
-        if (target == null) {
-            Log.w(TAG, "Telegram credentials are not configured, message dropped")
+        val botKey = repository.getTelegramBotKeyBlocking()
+        if (botKey.isBlank()) {
+            Log.w(TAG, "Telegram bot key is not configured, message dropped")
+            return
+        }
+        val linkedUsers = repository.getLinkedUsersBlocking()
+        if (linkedUsers.isNotEmpty()) {
+            linkedUsers.forEach { user ->
+                enqueueSendToChat(context, botKey, user.chatId, message)
+            }
             return
         }
 
+        val target = repository.getTelegramTargetBlocking()
+        if (target == null) {
+            Log.w(TAG, "Telegram chat id is not configured, message dropped")
+            return
+        }
+        enqueueSendToChat(context, botKey, target.chatId, message)
+    }
+
+    private fun enqueueSendToChat(context: Context, botKey: String, chatId: String, message: String) {
         val input = Data.Builder()
-            .putString(TelegramMessageWorker.KEY_BOT_KEY, target.botKey)
-            .putString(TelegramMessageWorker.KEY_CHAT_ID, target.chatId)
+            .putString(TelegramMessageWorker.KEY_BOT_KEY, botKey)
+            .putString(TelegramMessageWorker.KEY_CHAT_ID, chatId)
             .putString(TelegramMessageWorker.KEY_MESSAGE, message)
             .build()
         val constraints = Constraints.Builder()

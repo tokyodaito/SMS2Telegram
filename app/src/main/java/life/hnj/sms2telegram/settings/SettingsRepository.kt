@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import life.hnj.sms2telegram.dataStore
 import life.hnj.sms2telegram.events.EventType
+import life.hnj.sms2telegram.users.BotStatus
+import life.hnj.sms2telegram.users.LinkedUser
+import life.hnj.sms2telegram.users.UserJson
 
 class SettingsRepository(private val context: Context) {
     private val appContext = context.applicationContext
@@ -46,6 +49,82 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRemoteControlEnabled(enabled: Boolean) {
         setBoolean(REMOTE_CONTROL_ENABLED_KEY, enabled)
+    }
+
+    suspend fun isPairingActive(): Boolean = getBoolean(PAIRING_ACTIVE_KEY, false)
+
+    fun isPairingActiveBlocking(): Boolean = runBlocking { isPairingActive() }
+
+    suspend fun getPairingCode(): String = getString(PAIRING_CODE_KEY, "")
+
+    fun getPairingCodeBlocking(): String = runBlocking { getPairingCode() }
+
+    suspend fun getPairingExpiresAt(): Long = getLong(PAIRING_EXPIRES_AT_KEY, 0L)
+
+    fun getPairingExpiresAtBlocking(): Long = runBlocking { getPairingExpiresAt() }
+
+    suspend fun startPairing(code: String, expiresAt: Long) {
+        appContext.dataStore.edit { prefs ->
+            prefs[booleanPreferencesKey(PAIRING_ACTIVE_KEY)] = true
+            prefs[stringPreferencesKey(PAIRING_CODE_KEY)] = code
+            prefs[longPreferencesKey(PAIRING_EXPIRES_AT_KEY)] = expiresAt
+        }
+    }
+
+    fun startPairingBlocking(code: String, expiresAt: Long) =
+        runBlocking { startPairing(code, expiresAt) }
+
+    suspend fun stopPairing() {
+        appContext.dataStore.edit { prefs ->
+            prefs[booleanPreferencesKey(PAIRING_ACTIVE_KEY)] = false
+            prefs[stringPreferencesKey(PAIRING_CODE_KEY)] = ""
+            prefs[longPreferencesKey(PAIRING_EXPIRES_AT_KEY)] = 0L
+        }
+    }
+
+    fun stopPairingBlocking() = runBlocking { stopPairing() }
+
+    suspend fun getLinkedUsers(): List<LinkedUser> {
+        val raw = dataStoreSnapshot()[stringPreferencesKey(LINKED_USERS_JSON_KEY)]
+        return UserJson.usersFromJson(raw)
+    }
+
+    fun getLinkedUsersBlocking(): List<LinkedUser> = runBlocking { getLinkedUsers() }
+
+    suspend fun upsertLinkedUser(user: LinkedUser) {
+        val existing = getLinkedUsers().toMutableList()
+        val idx = existing.indexOfFirst { it.chatId == user.chatId }
+        if (idx >= 0) {
+            existing[idx] = user
+        } else {
+            existing.add(user)
+        }
+        appContext.dataStore.edit { prefs ->
+            prefs[stringPreferencesKey(LINKED_USERS_JSON_KEY)] = UserJson.usersToJson(existing)
+        }
+    }
+
+    fun upsertLinkedUserBlocking(user: LinkedUser) = runBlocking { upsertLinkedUser(user) }
+
+    suspend fun getBotStatus(): BotStatus? {
+        val raw = dataStoreSnapshot()[stringPreferencesKey(BOT_STATUS_JSON_KEY)]
+        return UserJson.botStatusFromJson(raw)
+    }
+
+    fun getBotStatusBlocking(): BotStatus? = runBlocking { getBotStatus() }
+
+    suspend fun setBotStatus(status: BotStatus) {
+        appContext.dataStore.edit { prefs ->
+            prefs[stringPreferencesKey(BOT_STATUS_JSON_KEY)] = UserJson.botStatusToJson(status)
+        }
+    }
+
+    fun setBotStatusBlocking(status: BotStatus) = runBlocking { setBotStatus(status) }
+
+    suspend fun clearBotStatus() {
+        appContext.dataStore.edit { prefs ->
+            prefs[stringPreferencesKey(BOT_STATUS_JSON_KEY)] = ""
+        }
     }
 
     suspend fun isEventEnabled(type: EventType): Boolean {
@@ -126,6 +205,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAdminChatIdsRaw(value: String) = setString(ADMIN_CHAT_IDS_KEY, value)
 
     suspend fun isAdminChatAllowed(chatId: String): Boolean {
+        val linked = getLinkedUsers()
+        if (linked.isNotEmpty()) {
+            return linked.any { it.chatId == chatId.trim() }
+        }
         val allowed = parseAdminChatIds()
         if (allowed.isEmpty()) {
             return false
@@ -235,6 +318,11 @@ class SettingsRepository(private val context: Context) {
     companion object {
         const val SYNC_ENABLED_KEY = "sms2telegram.settings.tg.enabled"
         const val REMOTE_CONTROL_ENABLED_KEY = "sms2telegram.settings.tg.remote_control.enabled"
+        const val PAIRING_ACTIVE_KEY = "sms2telegram.settings.pairing.active"
+        const val PAIRING_CODE_KEY = "sms2telegram.settings.pairing.code"
+        const val PAIRING_EXPIRES_AT_KEY = "sms2telegram.settings.pairing.expires_at"
+        const val LINKED_USERS_JSON_KEY = "sms2telegram.settings.users.json"
+        const val BOT_STATUS_JSON_KEY = "sms2telegram.settings.bot.status.json"
         const val TELEGRAM_BOT_KEY = "telegram_bot_key"
         const val TELEGRAM_CHAT_ID_KEY = "telegram_chat_id"
         const val ADMIN_CHAT_IDS_KEY = "telegram_admin_chat_ids"
