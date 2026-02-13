@@ -15,7 +15,7 @@ class TelephonyEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             TelephonyManager.ACTION_PHONE_STATE_CHANGED -> onPhoneStateChanged(context, intent)
-            TelephonyManager.ACTION_SIM_CARD_STATE_CHANGED,
+            ACTION_SIM_CARD_STATE_CHANGED_COMPAT,
             ACTION_SIM_STATE_CHANGED_COMPAT -> onSimStateChanged(context, intent)
         }
     }
@@ -109,6 +109,8 @@ class TelephonyEventReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "TelephonyEventReceiver"
+        private const val ACTION_SIM_CARD_STATE_CHANGED_COMPAT =
+            "android.telephony.action.SIM_CARD_STATE_CHANGED"
         private const val ACTION_SIM_STATE_CHANGED_COMPAT = "android.intent.action.SIM_STATE_CHANGED"
         private const val PREFS_NAME = "telephony_runtime_state"
         private const val KEY_LAST_CALL_STATE = "last_call_state"

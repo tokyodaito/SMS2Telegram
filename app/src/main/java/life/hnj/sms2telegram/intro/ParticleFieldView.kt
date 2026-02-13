@@ -45,16 +45,19 @@ class ParticleFieldView @JvmOverloads constructor(
     private var lastFrameNs: Long = 0L
     private var spawnAccumulator = 0f
 
-    private val frameCallback = Choreographer.FrameCallback { nowNs ->
-        if (!running) return@FrameCallback
-        if (lastFrameNs == 0L) lastFrameNs = nowNs
-        val dt = ((nowNs - lastFrameNs).coerceAtMost(50_000_000L)).toFloat() / 1_000_000_000f
-        lastFrameNs = nowNs
+    private val frameCallback: Choreographer.FrameCallback =
+        object : Choreographer.FrameCallback {
+            override fun doFrame(nowNs: Long) {
+                if (!running) return
+                if (lastFrameNs == 0L) lastFrameNs = nowNs
+                val dt = ((nowNs - lastFrameNs).coerceAtMost(50_000_000L)).toFloat() / 1_000_000_000f
+                lastFrameNs = nowNs
 
-        step(dt)
-        postInvalidateOnAnimation()
-        Choreographer.getInstance().postFrameCallback(frameCallback)
-    }
+                step(dt)
+                postInvalidateOnAnimation()
+                Choreographer.getInstance().postFrameCallback(this)
+            }
+        }
 
     fun setEmitterRect(l: Float, t: Float, r: Float, b: Float) {
         emitterL = l

@@ -23,6 +23,7 @@ import com.google.android.material.textfield.TextInputEditText
 import java.io.File
 import java.security.SecureRandom
 import java.util.Locale
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -33,6 +34,7 @@ import life.hnj.sms2telegram.runtime.SyncRuntimeManager
 import life.hnj.sms2telegram.settings.SettingsRepository
 import life.hnj.sms2telegram.telegram.TelegramApi
 import life.hnj.sms2telegram.users.BotStatus
+import life.hnj.sms2telegram.users.LinkedUser
 import life.hnj.sms2telegram.ui.UserAdapter
 
 class MainActivity : AppCompatActivity() {
@@ -252,7 +254,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun updateCountdown(expiresAt: Long) {
-        while (isActive) {
+        while (coroutineContext.isActive) {
             val remaining = expiresAt - System.currentTimeMillis()
             val dialog = pairingDialog ?: return
             val countdown = dialog.findViewById<TextView>(R.id.pairing_countdown)
@@ -266,7 +268,7 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun pollForPairing(botKey: String, code: String, expiresAt: Long) {
         var offset = settingsRepository.getTelegramOffsetBlocking()
-        while (isActive && System.currentTimeMillis() < expiresAt) {
+        while (coroutineContext.isActive && System.currentTimeMillis() < expiresAt) {
             val updates = runCatching { TelegramApi.getUpdates(botKey, offset, timeoutSeconds = 3) }.getOrNull()
             if (updates == null || !updates.optBoolean("ok", false)) {
                 delay(1000)
