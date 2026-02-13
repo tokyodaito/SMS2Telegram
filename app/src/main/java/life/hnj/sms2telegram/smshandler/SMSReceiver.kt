@@ -13,9 +13,9 @@ import life.hnj.sms2telegram.settings.SettingsRepository
 
 private const val TAG = "SMSHandler"
 
-class SMSReceiver(
-    private val eventForwarder: EventForwarder = EventForwarder(),
-) : BroadcastReceiver() {
+class SMSReceiver : BroadcastReceiver() {
+    private val eventForwarder = EventForwarder()
+
     override fun onReceive(context: Context, intent: Intent) {
         val bundle = intent.extras ?: return
         val format = bundle.getString("format")

@@ -14,13 +14,14 @@ object TelegramControlScheduler {
     fun ensureScheduled(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
             .build()
-        val request = PeriodicWorkRequestBuilder<TelegramControlWorker>(15, TimeUnit.MINUTES)
+        val request = PeriodicWorkRequestBuilder<TelegramControlWorker>(1, TimeUnit.HOURS)
             .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
             UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingPeriodicWorkPolicy.KEEP,
             request
         )
     }

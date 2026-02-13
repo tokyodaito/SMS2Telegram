@@ -40,11 +40,30 @@ class SettingsRepository(private val context: Context) {
         setBoolean(SYNC_ENABLED_KEY, value)
     }
 
+    suspend fun isRemoteControlEnabled(): Boolean = getBoolean(REMOTE_CONTROL_ENABLED_KEY, false)
+
+    fun isRemoteControlEnabledBlocking(): Boolean = runBlocking { isRemoteControlEnabled() }
+
+    suspend fun setRemoteControlEnabled(enabled: Boolean) {
+        setBoolean(REMOTE_CONTROL_ENABLED_KEY, enabled)
+    }
+
     suspend fun isEventEnabled(type: EventType): Boolean {
         return getBoolean(eventEnabledKeyName(type), defaultEnabled(type))
     }
 
     fun isEventEnabledBlocking(type: EventType): Boolean = runBlocking { isEventEnabled(type) }
+
+    fun canForwardEventBlocking(type: EventType): Boolean = runBlocking {
+        val snapshot = dataStoreSnapshot()
+        val syncEnabled = snapshot[booleanPreferencesKey(SYNC_ENABLED_KEY)] ?: false
+        if (!syncEnabled) {
+            return@runBlocking false
+        }
+        val eventEnabled =
+            snapshot[booleanPreferencesKey(eventEnabledKeyName(type))] ?: defaultEnabled(type)
+        return@runBlocking eventEnabled
+    }
 
     suspend fun setEventEnabled(type: EventType, enabled: Boolean) {
         setBoolean(eventEnabledKeyName(type), enabled)
@@ -77,11 +96,32 @@ class SettingsRepository(private val context: Context) {
 
     fun getTelegramChatIdBlocking(): String = runBlocking { getTelegramChatId() }
 
+    fun getTelegramTargetBlocking(): TelegramTarget? = runBlocking {
+        val snapshot = dataStoreSnapshot()
+        val botKey = snapshot[stringPreferencesKey(TELEGRAM_BOT_KEY)]
+            ?: PreferenceManager.getDefaultSharedPreferences(appContext).getString(TELEGRAM_BOT_KEY, "")
+            .orEmpty()
+        val chatId = snapshot[stringPreferencesKey(TELEGRAM_CHAT_ID_KEY)]
+            ?: PreferenceManager.getDefaultSharedPreferences(appContext).getString(TELEGRAM_CHAT_ID_KEY, "")
+            .orEmpty()
+        if (botKey.isBlank() || chatId.isBlank()) {
+            return@runBlocking null
+        }
+        return@runBlocking TelegramTarget(botKey = botKey, chatId = chatId)
+    }
+
     suspend fun setTelegramChatId(value: String) = setString(TELEGRAM_CHAT_ID_KEY, value)
 
     suspend fun getAdminChatIdsRaw(): String = getString(ADMIN_CHAT_IDS_KEY, "")
 
     fun getAdminChatIdsRawBlocking(): String = runBlocking { getAdminChatIdsRaw() }
+
+    fun hasAdminChatsConfiguredBlocking(): Boolean {
+        return getAdminChatIdsRawBlocking()
+            .split(",", "\n", " ")
+            .map { it.trim() }
+            .any { it.isNotEmpty() }
+    }
 
     suspend fun setAdminChatIdsRaw(value: String) = setString(ADMIN_CHAT_IDS_KEY, value)
 
@@ -194,6 +234,7 @@ class SettingsRepository(private val context: Context) {
 
     companion object {
         const val SYNC_ENABLED_KEY = "sms2telegram.settings.tg.enabled"
+        const val REMOTE_CONTROL_ENABLED_KEY = "sms2telegram.settings.tg.remote_control.enabled"
         const val TELEGRAM_BOT_KEY = "telegram_bot_key"
         const val TELEGRAM_CHAT_ID_KEY = "telegram_chat_id"
         const val ADMIN_CHAT_IDS_KEY = "telegram_admin_chat_ids"
@@ -212,6 +253,11 @@ class SettingsRepository(private val context: Context) {
         }
     }
 }
+
+data class TelegramTarget(
+    val botKey: String,
+    val chatId: String,
+)
 
 class AppPreferenceDataStore(context: Context) : PreferenceDataStore() {
     private val repository = SettingsRepository(context)

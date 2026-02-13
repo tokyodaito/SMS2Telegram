@@ -9,12 +9,8 @@ import life.hnj.sms2telegram.events.EventForwarder
 import life.hnj.sms2telegram.events.EventType
 import life.hnj.sms2telegram.events.PhoneEvent
 
-class TelephonyEventReceiver(
-    private val eventForwarder: EventForwarder = EventForwarder(),
-) : BroadcastReceiver() {
-    private var lastCallState = TelephonyManager.CALL_STATE_IDLE
-    private var ringingNumber: String? = null
-    private var answered = false
+class TelephonyEventReceiver : BroadcastReceiver() {
+    private val eventForwarder = EventForwarder()
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
@@ -26,7 +22,7 @@ class TelephonyEventReceiver(
 
     private fun onPhoneStateChanged(context: Context, intent: Intent) {
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
-        val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: "unknown"
+        val incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: "unknown"
         val callState = when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> TelephonyManager.CALL_STATE_RINGING
             TelephonyManager.EXTRA_STATE_OFFHOOK -> TelephonyManager.CALL_STATE_OFFHOOK
@@ -34,20 +30,25 @@ class TelephonyEventReceiver(
             else -> return
         }
 
+        val runtime = loadRuntime(context)
+        var lastState = runtime.lastCallState
+        var ringingNumber = runtime.ringingNumber
+        var answered = runtime.answered
+
         when (callState) {
             TelephonyManager.CALL_STATE_RINGING -> {
-                ringingNumber = number
+                ringingNumber = incomingNumber
                 answered = false
             }
 
             TelephonyManager.CALL_STATE_OFFHOOK -> {
-                if (lastCallState == TelephonyManager.CALL_STATE_RINGING) {
+                if (lastState == TelephonyManager.CALL_STATE_RINGING) {
                     answered = true
                 }
             }
 
             TelephonyManager.CALL_STATE_IDLE -> {
-                if (lastCallState == TelephonyManager.CALL_STATE_RINGING && !answered) {
+                if (lastState == TelephonyManager.CALL_STATE_RINGING && !answered) {
                     val caller = ringingNumber ?: "unknown"
                     eventForwarder.forward(
                         context,
@@ -63,7 +64,9 @@ class TelephonyEventReceiver(
                 answered = false
             }
         }
-        lastCallState = callState
+
+        lastState = callState
+        storeRuntime(context, TelephonyRuntime(lastState, ringingNumber, answered))
     }
 
     private fun onSimStateChanged(context: Context, intent: Intent) {
@@ -80,8 +83,36 @@ class TelephonyEventReceiver(
         )
     }
 
+    private fun loadRuntime(context: Context): TelephonyRuntime {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return TelephonyRuntime(
+            lastCallState = prefs.getInt(KEY_LAST_CALL_STATE, TelephonyManager.CALL_STATE_IDLE),
+            ringingNumber = prefs.getString(KEY_RINGING_NUMBER, null),
+            answered = prefs.getBoolean(KEY_ANSWERED, false)
+        )
+    }
+
+    private fun storeRuntime(context: Context, runtime: TelephonyRuntime) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt(KEY_LAST_CALL_STATE, runtime.lastCallState)
+            .putString(KEY_RINGING_NUMBER, runtime.ringingNumber)
+            .putBoolean(KEY_ANSWERED, runtime.answered)
+            .apply()
+    }
+
+    private data class TelephonyRuntime(
+        val lastCallState: Int,
+        val ringingNumber: String?,
+        val answered: Boolean,
+    )
+
     companion object {
         private const val TAG = "TelephonyEventReceiver"
         private const val ACTION_SIM_STATE_CHANGED_COMPAT = "android.intent.action.SIM_STATE_CHANGED"
+        private const val PREFS_NAME = "telephony_runtime_state"
+        private const val KEY_LAST_CALL_STATE = "last_call_state"
+        private const val KEY_RINGING_NUMBER = "ringing_number"
+        private const val KEY_ANSWERED = "answered"
     }
 }

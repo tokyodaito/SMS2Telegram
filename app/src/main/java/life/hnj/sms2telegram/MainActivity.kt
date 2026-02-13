@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Build
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -15,6 +14,7 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.runBlocking
+import life.hnj.sms2telegram.events.EventType
 import life.hnj.sms2telegram.runtime.SyncRuntimeManager
 import life.hnj.sms2telegram.settings.SettingsRepository
 
@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
         val toggle = findViewById<SwitchCompat>(R.id.enable_telegram_sync)
         if (syncEnabled) {
             requestPermissions(requestPermissionLauncher)
-            SyncRuntimeManager.start(applicationContext)
+            SyncRuntimeManager.reconfigure(applicationContext)
         }
         toggle.isChecked = syncEnabled
         toggle.setOnCheckedChangeListener { _, isChecked ->
@@ -58,20 +58,23 @@ class MainActivity : AppCompatActivity() {
             if (isChecked) {
                 requestPermissions(requestPermissionLauncher)
                 SyncRuntimeManager.start(applicationContext)
-                Toast.makeText(applicationContext, "The service started", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, "Sync enabled", Toast.LENGTH_SHORT).show()
             } else {
                 SyncRuntimeManager.stop(applicationContext)
-                Toast.makeText(applicationContext, "The service stopped", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, "Sync disabled", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun requestPermissions(requestPermissionLauncher: ActivityResultLauncher<String>) {
-        checkPermission(Manifest.permission.RECEIVE_SMS, requestPermissionLauncher)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            checkPermission(Manifest.permission.POST_NOTIFICATIONS, requestPermissionLauncher)
+        if (settingsRepository.isEventEnabledBlocking(EventType.SMS)) {
+            checkPermission(Manifest.permission.RECEIVE_SMS, requestPermissionLauncher)
         }
-        checkPermission(Manifest.permission.READ_PHONE_STATE, requestPermissionLauncher)
+        val needsPhoneStatePermission = settingsRepository.isEventEnabledBlocking(EventType.MISSED_CALL) ||
+            settingsRepository.isEventEnabledBlocking(EventType.SIM_STATE)
+        if (needsPhoneStatePermission) {
+            checkPermission(Manifest.permission.READ_PHONE_STATE, requestPermissionLauncher)
+        }
     }
 
     private fun checkPermission(

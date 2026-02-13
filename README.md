@@ -1,7 +1,7 @@
 # SMS2Telegram
 
-Barebone background service that forwards your incoming new SMS (text message) into a chat with a telegram bot.
-This program does not connect to any intermediate server, it simply issues a new request to telegram bot API each time the phone gets a new SMS.
+Lightweight event-driven app that forwards selected phone events into a Telegram chat.
+This program does not connect to any intermediate server. It sends requests directly to Telegram Bot API only when configured events happen.
 
 
 ## Supported System
@@ -18,7 +18,7 @@ Only tested on
 You'll need (1) a telegram bot key (2) the telegram chat id to which you want the bot to forward.
 You should be able to follow https://dev.to/rizkyrajitha/get-notifications-with-telegram-bot-537l to obtain your telegram bot key and chat id.
 
-You'll also want to turn off battery optimisation for this APP to avoid it being killed by the system.
+On some OEM firmware, disabling battery optimization may improve reliability for background delivery.
 
 ### Forwarded events
 
@@ -42,6 +42,15 @@ Set `Admin Chat Ids` in settings (comma separated). Only these chats can use com
 - `/enable <event|all>`
 - `/disable <event|all>`
 - `/help`
+
+Remote control polling is disabled by default to save battery. Enable it in settings only if you need bot commands.
+
+### Battery optimization
+
+- App works in event-driven mode (no permanent foreground service).
+- Broadcast receivers are enabled only when sync is enabled.
+- Telegram command polling is optional and low-frequency.
+- Network work uses WorkManager constraints and exponential backoff.
 
 
 ## Download

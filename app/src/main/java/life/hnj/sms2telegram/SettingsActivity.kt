@@ -1,12 +1,16 @@
 package life.hnj.sms2telegram
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
+import life.hnj.sms2telegram.events.EventType
 import life.hnj.sms2telegram.runtime.SyncRuntimeManager
 import life.hnj.sms2telegram.settings.AppPreferenceDataStore
 import life.hnj.sms2telegram.settings.SettingsRepository
@@ -53,6 +57,8 @@ class SettingsActivity : AppCompatActivity() {
             super.onViewCreated(view, savedInstanceState)
 
             setupRuntimeSwitchListener()
+            setupRemoteControlSwitchListener()
+            setupPermissionAwareEventListeners()
             setupTestMessageAction()
         }
 
@@ -88,6 +94,54 @@ class SettingsActivity : AppCompatActivity() {
                 )
                 true
             }
+        }
+
+        private fun setupRemoteControlSwitchListener() {
+            val key = SettingsRepository.REMOTE_CONTROL_ENABLED_KEY
+            val remoteSwitch = findPreference<SwitchPreferenceCompat>(key) ?: return
+            remoteSwitch.setOnPreferenceChangeListener { _, _ ->
+                listView.post {
+                    SyncRuntimeManager.reconfigure(requireContext())
+                }
+                true
+            }
+        }
+
+        private fun setupPermissionAwareEventListeners() {
+            setupPermissionRequestOnEnable(
+                SettingsRepository.eventEnabledKeyName(EventType.SMS),
+                Manifest.permission.RECEIVE_SMS
+            )
+            setupPermissionRequestOnEnable(
+                SettingsRepository.eventEnabledKeyName(EventType.MISSED_CALL),
+                Manifest.permission.READ_PHONE_STATE
+            )
+            setupPermissionRequestOnEnable(
+                SettingsRepository.eventEnabledKeyName(EventType.SIM_STATE),
+                Manifest.permission.READ_PHONE_STATE
+            )
+        }
+
+        private fun setupPermissionRequestOnEnable(preferenceKey: String, permission: String) {
+            val switch = findPreference<SwitchPreferenceCompat>(preferenceKey) ?: return
+            switch.setOnPreferenceChangeListener { _, newValue ->
+                val enabled = newValue as? Boolean ?: false
+                if (enabled && ContextCompat.checkSelfPermission(
+                        requireContext(),
+                        permission
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    requestPermissions(arrayOf(permission), PERMISSION_REQUEST_CODE)
+                }
+                listView.post {
+                    SyncRuntimeManager.reconfigure(requireContext())
+                }
+                true
+            }
+        }
+
+        companion object {
+            private const val PERMISSION_REQUEST_CODE = 1001
         }
     }
 }

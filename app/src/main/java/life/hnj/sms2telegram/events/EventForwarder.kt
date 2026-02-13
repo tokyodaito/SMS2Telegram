@@ -11,10 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 class EventForwarder {
     fun forward(context: Context, event: PhoneEvent) {
         val repository = SettingsRepository(context)
-        if (!repository.isSyncEnabledBlocking()) {
-            return
-        }
-        if (!repository.isEventEnabledBlocking(event.type)) {
+        if (!repository.canForwardEventBlocking(event.type)) {
             return
         }
         if (isDebounced(event.type)) {

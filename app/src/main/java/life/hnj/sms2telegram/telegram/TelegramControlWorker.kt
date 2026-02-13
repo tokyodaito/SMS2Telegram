@@ -20,9 +20,15 @@ class TelegramControlWorker(
         if (!settings.isSyncEnabledBlocking()) {
             return Result.success()
         }
+        if (!settings.isRemoteControlEnabledBlocking()) {
+            return Result.success()
+        }
 
         val botKey = settings.getTelegramBotKeyBlocking()
         if (botKey.isBlank()) {
+            return Result.success()
+        }
+        if (!settings.hasAdminChatsConfiguredBlocking()) {
             return Result.success()
         }
 

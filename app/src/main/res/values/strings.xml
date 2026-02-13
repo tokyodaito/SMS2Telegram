@@ -13,7 +13,9 @@
 
     <!-- Sync Preferences -->
     <string name="sync_telegram_title">Sync phone events to Telegram</string>
-    <string name="sync_telegram_summary">Enable background service and Telegram control polling</string>
+    <string name="sync_telegram_summary">Enable event-driven forwarding with low background activity</string>
+    <string name="remote_control_title">Enable Telegram remote control</string>
+    <string name="remote_control_summary">If disabled, bot commands are not polled to save battery</string>
     <string name="action_settings">Settings</string>
     <string name="telegram_bot_key">Telegram Bot Key</string>
     <string name="telegram_chat_id">Telegram Chat Id</string>

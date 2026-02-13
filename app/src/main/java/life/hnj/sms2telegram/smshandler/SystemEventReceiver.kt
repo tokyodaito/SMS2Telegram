@@ -7,9 +7,9 @@ import life.hnj.sms2telegram.events.EventForwarder
 import life.hnj.sms2telegram.events.EventType
 import life.hnj.sms2telegram.events.PhoneEvent
 
-class SystemEventReceiver(
-    private val eventForwarder: EventForwarder = EventForwarder(),
-) : BroadcastReceiver() {
+class SystemEventReceiver : BroadcastReceiver() {
+    private val eventForwarder = EventForwarder()
+
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             Intent.ACTION_BATTERY_LOW -> {

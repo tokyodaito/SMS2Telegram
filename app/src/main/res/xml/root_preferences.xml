@@ -27,6 +27,12 @@
             app:summary="@string/sync_telegram_summary"
             app:title="@string/sync_telegram_title" />
 
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="sms2telegram.settings.tg.remote_control.enabled"
+            app:summary="@string/remote_control_summary"
+            app:title="@string/remote_control_title" />
+
         <Preference
             app:key="send_test_message"
             app:summary="@string/send_test_message_summary"
