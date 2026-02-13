@@ -16,4 +16,10 @@
         <item name="windowNoTitle">true</item>
         <item name="actionOverflowMenuStyle">@style/OverflowMenu</item>
     </style>
+
+    <style name="Theme.SMS2Telegram.Intro" parent="Theme.SMS2Telegram">
+        <item name="android:statusBarColor" tools:targetApi="l">@android:color/transparent</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">@android:color/transparent</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
 </resources>

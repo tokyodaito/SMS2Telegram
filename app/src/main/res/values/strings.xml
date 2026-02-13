@@ -36,6 +36,13 @@
     <string name="pairing_instructions">Send this code to the bot in a private chat to connect the user.</string>
     <string name="user_avatar">User avatar</string>
 
+    <string name="intro_open_app">Открыть</string>
+    <string name="intro_skip">Пропустить</string>
+    <string name="intro_disable">Не показывать</string>
+    <string name="intro_mute">Выключить звук</string>
+    <string name="intro_unmute">Включить звук</string>
+    <string name="intro_background">Фон интро-экрана</string>
+
     <string name="event_sms">SMS</string>
     <string name="event_missed_call">Missed call</string>
     <string name="event_battery_low">Battery low</string>

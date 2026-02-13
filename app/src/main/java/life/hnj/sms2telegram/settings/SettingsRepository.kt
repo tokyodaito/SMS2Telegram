@@ -20,6 +20,26 @@ import life.hnj.sms2telegram.users.UserJson
 class SettingsRepository(private val context: Context) {
     private val appContext = context.applicationContext
 
+    suspend fun isIntroEnabled(): Boolean = getBoolean(INTRO_ENABLED_KEY, true)
+
+    fun isIntroEnabledBlocking(): Boolean = runBlocking { isIntroEnabled() }
+
+    suspend fun setIntroEnabled(enabled: Boolean) {
+        setBoolean(INTRO_ENABLED_KEY, enabled)
+    }
+
+    fun setIntroEnabledBlocking(enabled: Boolean) = runBlocking { setIntroEnabled(enabled) }
+
+    suspend fun isIntroMuted(): Boolean = getBoolean(INTRO_MUTED_KEY, false)
+
+    fun isIntroMutedBlocking(): Boolean = runBlocking { isIntroMuted() }
+
+    suspend fun setIntroMuted(muted: Boolean) {
+        setBoolean(INTRO_MUTED_KEY, muted)
+    }
+
+    fun setIntroMutedBlocking(muted: Boolean) = runBlocking { setIntroMuted(muted) }
+
     suspend fun migrateLegacyIfNeeded() {
         if (getBoolean(MIGRATED_KEY, false)) {
             return
@@ -318,6 +338,8 @@ class SettingsRepository(private val context: Context) {
     companion object {
         const val SYNC_ENABLED_KEY = "sms2telegram.settings.tg.enabled"
         const val REMOTE_CONTROL_ENABLED_KEY = "sms2telegram.settings.tg.remote_control.enabled"
+        const val INTRO_ENABLED_KEY = "sms2telegram.settings.intro.enabled"
+        const val INTRO_MUTED_KEY = "sms2telegram.settings.intro.muted"
         const val PAIRING_ACTIVE_KEY = "sms2telegram.settings.pairing.active"
         const val PAIRING_CODE_KEY = "sms2telegram.settings.pairing.code"
         const val PAIRING_EXPIRES_AT_KEY = "sms2telegram.settings.pairing.expires_at"
