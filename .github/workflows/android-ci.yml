@@ -58,7 +58,13 @@ jobs:
             exit 1
           fi
           mkdir -p dist
-          APK_NAME="sms2telegram-${GITHUB_SHA::7}.apk"
+          if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
+            APK_NAME="sms2telegram-nightly.apk"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            APK_NAME="sms2telegram-${GITHUB_REF_NAME}.apk"
+          else
+            APK_NAME="sms2telegram-${GITHUB_SHA::7}.apk"
+          fi
           cp "$APK_PATH" "dist/${APK_NAME}"
           echo "apk_file=dist/${APK_NAME}" >> "$GITHUB_OUTPUT"
 
@@ -69,6 +75,31 @@ jobs:
           path: ${{ steps.prepare.outputs.apk_file }}
           if-no-files-found: error
           retention-days: 30
+
+  publish-nightly-release:
+    name: Publish Nightly GitHub Release Asset
+    if: github.ref == 'refs/heads/master'
+    needs: build-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sms2telegram-apk
+          path: dist
+
+      - name: Create or update nightly prerelease and upload APK
+        uses: ncipollo/release-action@v1
+        with:
+          tag: nightly
+          name: Nightly
+          prerelease: true
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: "dist/*.apk"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
     name: Publish GitHub Release Asset
@@ -90,6 +121,47 @@ jobs:
           files: dist/*.apk
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+  publish-nightly-package:
+    name: Publish Nightly APK to GitHub Packages (GHCR)
+    if: github.ref == 'refs/heads/master'
+    needs: build-apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sms2telegram-apk
+          path: dist
+
+      - name: Set up ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push APK as OCI artifact (nightly)
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          GIT_SHA: ${{ github.sha }}
+          GIT_REPO: ${{ github.repository }}
+        run: |
+          OWNER_LC="$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')"
+          NAME_LC="$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]')"
+          APK_FILE="$(find dist -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK_FILE" ]; then
+            echo "No APK file found in dist/"
+            exit 1
+          fi
+          PACKAGE_REF="ghcr.io/${OWNER_LC}/${NAME_LC}-apk:nightly"
+          oras push "$PACKAGE_REF" \
+            "$APK_FILE:application/vnd.android.package-archive" \
+            --annotation "org.opencontainers.image.source=https://github.com/${GIT_REPO}" \
+            --annotation "org.opencontainers.image.revision=${GIT_SHA}"
 
   publish-package:
     name: Publish APK to GitHub Packages (GHCR)
